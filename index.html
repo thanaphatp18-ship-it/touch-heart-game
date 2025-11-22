@@ -195,24 +195,27 @@
         });
 
         // ได้รับข้อความเฉลย (Inbox)
-        socket.on('revealMessages', (messages) => {
-            const container = document.getElementById('inboxContainer');
-            container.innerHTML = '';
+        // --- แก้ไขส่วนนี้ใน index.html ---
 
-            if (messages.length === 0) {
-                container.innerHTML = '<p>ไม่มีข้อความถึงคุณ (เอ๊ะ?)</p>';
-                return;
+        // อัปเดตข้อมูลห้อง (แบบใหม่)
+        socket.on('updateRoomData', ({ users, hostId }) => {
+            // แสดงรายชื่อ
+            userListUI.innerHTML = users.map(u =>
+                `<li>${u.name} ${u.id === socket.id ? '(คุณ)' : ''} ${u.id === hostId ? '👑' : ''}</li>`
+            ).join('');
+
+            // เช็คว่า ฉันคือ Host หรือไม่?
+            if (socket.id === hostId) {
+                // เป็น Host: เช็คจำนวนคน ถ้า >= 2 ให้กดเริ่มได้
+                if (users.length >= 2) {
+                    startBtn.classList.remove('hidden');
+                } else {
+                    startBtn.classList.add('hidden'); // คนยังไม่ครบ
+                }
+            } else {
+                // ไม่ใช่ Host: ซ่อนปุ่มตลอดกาล
+                startBtn.classList.add('hidden');
             }
-
-            messages.forEach((msg, index) => {
-                // เพิ่ม delay เล็กน้อยให้การ์ดค่อยๆ โผล่มาทีละใบ
-                setTimeout(() => {
-                    const card = document.createElement('div');
-                    card.className = 'result-card pop-in';
-                    card.innerHTML = `"${msg.content}"`;
-                    container.appendChild(card);
-                }, index * 300);
-            });
         });
 
     </script>
