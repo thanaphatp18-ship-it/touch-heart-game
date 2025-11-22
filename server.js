@@ -44,6 +44,20 @@ io.on('connection', (socket) => {
         // ====================================
 
         updateRoomDetails(roomCode);
+        // === ส่วนที่เพิ่ม: การกู้คืนสถานะ ===
+        if (rooms[roomCode].gameState === 'writing') {
+            // ถ้าเกมกำลังเขียน ให้ส่ง event gameStarted ไปอีกรอบ
+            const user = rooms[roomCode].users.find(u => u.id === socket.id);
+            if (user) {
+                const targets = rooms[roomCode].users.filter(u => u.name !== user.name);
+                io.to(user.id).emit('gameStarted', { targets: targets });
+                io.to(user.id).emit('updateStatus', `เกมกำลังดำเนินต่อ...`);
+            }
+        } else if (rooms[roomCode].gameState === 'revealing') {
+            // ถ้าเกมจบแล้ว ให้ส่ง event allSubmitted เพื่อเริ่มนับถอยหลังทันที
+            io.to(socket.id).emit('allSubmitted');
+            // Server จะ distributeMessages เองในไม่ช้า
+        }
     });
 
     // 2. หัวหน้าห้องกดเริ่มเกม
@@ -121,6 +135,21 @@ io.on('connection', (socket) => {
             hostId: hostId
         });
     }
+
+    // ในไฟล์ server.js หา socket.on('requestRestart', (roomCode) => { ... });
+
+    socket.on('requestRestart', (roomCode) => {
+        // ลบห้องทิ้ง เพื่อเคลียร์ข้อมูลทั้งหมด
+        if (rooms[roomCode]) {
+            console.log(`Room ${roomCode} has been deleted for restart.`);
+
+            // *** ต้องเพิ่มบรรทัดนี้ เพื่อแจ้งเตือนผู้เล่นที่เหลือในห้อง ***
+            io.to(roomCode).emit('roomDeleted');
+            // *********************************************************
+
+            delete rooms[roomCode];
+        }
+    });
 });
 
 const PORT = process.env.PORT || 3000;

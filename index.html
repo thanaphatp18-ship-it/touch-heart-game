@@ -52,6 +52,7 @@
                 <p class="status-text">นี่คือสิ่งที่เพื่อนๆ บอกคุณ (ไม่ระบุตัวตน)</p>
                 <div id="inboxContainer" class="inbox-grid">
                 </div>
+                <button id="restartBtn" class="btn-secondary">เล่นอีกครั้ง (New Round)</button>
             </div>
         </div>
     </div>
@@ -74,6 +75,9 @@
         const countdownOverlay = document.getElementById('countdownOverlay');
         const countdownNum = document.getElementById('countdownNum');
         const messagesResultUI = document.getElementById('messagesResult');
+        // *** จุดที่ 2: เพิ่มตัวแปร DOM สำหรับปุ่ม Restart ***
+        const restartBtn = document.getElementById('restartBtn');
+        // ************************************************
 
         // --- Helper: ฟังก์ชันสลับหน้าจอ ---
         function showScreen(screenId) {
@@ -122,80 +126,25 @@
             submitBtn.classList.add('hidden');
         });
 
+        // *** จุดที่ 3: เพิ่ม Event Listener สำหรับปุ่ม Restart ***
+        restartBtn.addEventListener('click', () => {
+            // 1. แจ้ง Server ว่าขอรีเซ็ตห้อง
+            socket.emit('requestRestart', currentRoomCode);
+            // 2. กลับไปหน้า Lobby ทันที
+            showScreen('screen-lobby');
+
+            // 3. เคลียร์ค่าค้างใน UI (ใช้ชื่อ/โค้ดเดิม)
+            targetsList = [];
+            usernameInput.value = myUsername;
+            roomCodeInput.value = currentRoomCode;
+        });
+        // ****************************************************
+
         // --- Socket Events (รับข้อมูลจาก Server) ---
 
-        // อัปเดตข้อมูลห้อง (มีคนเข้า/ออก)
-        socket.on('updateRoomData', ({ users, isHost }) => {
-            userListUI.innerHTML = users.map(u => `<li>${u.name} ${u.id === socket.id ? '(คุณ)' : ''}</li>`).join('');
-            // ถ้าเป็นหัวหน้าห้อง ให้แสดงปุ่ม Start
-            if (isHost && users.length >= 2) {
-                startBtn.classList.remove('hidden');
-            } else {
-                startBtn.classList.add('hidden');
-            }
-        });
+        // ... (โค้ด socket.on('updateRoomData', ...), socket.on('gameStarted', ...) และ function checkAllInputsFilled() ... )
 
-        // เริ่มเกม: สร้างช่องกรอกข้อความ
-        socket.on('gameStarted', ({ targets }) => {
-            targetsList = targets;
-            showScreen('screen-writing');
-            writingAreaUI.innerHTML = ''; // เคลียร์ของเก่า
-
-            targets.forEach(target => {
-                const div = document.createElement('div');
-                div.className = 'message-input-card fade-in';
-                div.innerHTML = `
-                    <label>ถึง: <b>${target.name}</b></label>
-                    <textarea id="msg-to-${target.id}" placeholder="พิมพ์ข้อความ..."></textarea>
-                `;
-                writingAreaUI.appendChild(div);
-
-                // เช็คว่ากรอกครบหรือยัง เพื่อเปิดปุ่ม Submit
-                const textarea = div.querySelector('textarea');
-                textarea.addEventListener('input', checkAllInputsFilled);
-            });
-        });
-
-        function checkAllInputsFilled() {
-            let allFilled = true;
-            targetsList.forEach(target => {
-                const val = document.getElementById(`msg-to-${target.id}`).value.trim();
-                if (val === '') allFilled = false;
-            });
-
-            if (allFilled && targetsList.length > 0) {
-                submitBtn.classList.remove('disabled');
-            } else {
-                submitBtn.classList.add('disabled');
-            }
-        }
-
-        // อัปเดตสถานะการส่ง (เช่น "รอเพื่อนๆ 2/3")
-        socket.on('updateStatus', (msg) => {
-            document.getElementById('writingStatus').innerText = msg;
-        });
-
-        // ทุกคนส่งครบแล้ว -> เริ่มนับถอยหลัง
-        socket.on('allSubmitted', () => {
-            showScreen('screen-reveal');
-            countdownOverlay.classList.remove('hidden');
-            messagesResultUI.classList.add('hidden');
-
-            let count = 3;
-            countdownNum.innerText = count;
-            const timer = setInterval(() => {
-                count--;
-                countdownNum.innerText = count;
-                if (count <= 0) {
-                    clearInterval(timer);
-                    countdownOverlay.classList.add('hidden');
-                    messagesResultUI.classList.remove('hidden');
-                }
-            }, 1000);
-        });
-
-        // ได้รับข้อความเฉลย (Inbox)
-        // --- ส่วนที่ต้องเพิ่มกลับเข้าไป ---
+        // ... (โค้ด socket.on('updateStatus', ...), socket.on('allSubmitted', ...) ... )
 
         // ได้รับข้อความเฉลย (Inbox)
         socket.on('revealMessages', (messages) => {
@@ -215,7 +164,12 @@
             });
         });
 
-        // --- แก้ไขส่วนนี้ใน index.html ---
+        // *** จุดที่ 4: เพิ่ม Event สำหรับรับแจ้งเตือนเมื่อห้องถูกลบ (Room Deletion) ***
+        socket.on('roomDeleted', () => {
+            alert('หัวหน้าห้องได้ปิดห้องและเริ่มต้นใหม่แล้ว กรุณาเข้าห้องใหม่อีกครั้ง');
+            showScreen('screen-lobby');
+        });
+        // *************************************************************************
 
         // อัปเดตข้อมูลห้อง (แบบใหม่)
         socket.on('updateRoomData', ({ users, hostId }) => {
