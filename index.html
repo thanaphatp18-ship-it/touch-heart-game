@@ -109,16 +109,16 @@
             targetsList.forEach(target => {
                 const input = document.getElementById(`msg-to-${target.id}`);
                 messagesToSend.push({
-                    targetId: target.id,
+                    // แก้ตรงนี้: ส่งชื่อเพื่อน (target.name) ไปด้วย
+                    targetName: target.name,
                     content: input.value.trim()
                 });
             });
 
             socket.emit('submitMessages', { roomCode: currentRoomCode, messages: messagesToSend });
 
-            // ปรับ UI เพื่อรอคนอื่น
             document.getElementById('writingStatus').innerText = "ส่งแล้ว! รอเพื่อนคนอื่นสักครู่...";
-            writingAreaUI.innerHTML = '<div class="loader"></div>'; // แสดง loading
+            writingAreaUI.innerHTML = '<div class="loader"></div>';
             submitBtn.classList.add('hidden');
         });
 

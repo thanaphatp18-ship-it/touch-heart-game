@@ -92,12 +92,18 @@ io.on('connection', (socket) => {
     function distributeMessages(roomCode) {
         const room = rooms[roomCode];
         if (!room) return;
+
         room.users.forEach(user => {
+            // แก้ตรงนี้: เช็คจากชื่อ (targetName === user.name) แทน ID
             const myMessages = room.messageBuffer
-                .filter(msg => msg.targetId === user.id)
+                .filter(msg => msg.targetName === user.name)
                 .map(msg => ({ content: msg.content }));
+
             io.to(user.id).emit('revealMessages', myMessages);
         });
+
+        // (Optional) ล้างข้อมูลห้องหลังเล่นจบ เพื่อประหยัด Ram
+        // delete rooms[roomCode];
     }
 
     // ฟังก์ชันช่วยส่งข้อมูลห้อง (แก้ Logic การหา Host)
