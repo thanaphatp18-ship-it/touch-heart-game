@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทัชอก ทัชใจ</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <div class="animated-bg"></div>
+
+    <div class="container">
+        <div id="screen-lobby" class="screen active">
+            <h1 class="main-title">ทัชอก ทัชใจ</h1>
+            <h2 class="sub-title">มีอะไรข้องใจก็พูด !!</h2>
+            <div class="input-group fade-in">
+                <input type="text" id="usernameInput" placeholder="ชื่อของคุณ (Your Name)" maxlength="20">
+                <input type="text" id="roomCodeInput" placeholder="รหัสห้อง (เช่น 1234)" maxlength="6">
+                <button id="joinBtn" class="btn-primary">เข้าสู่ห้อง / สร้างห้อง</button>
+            </div>
+        </div>
+
+        <div id="screen-waiting" class="screen">
+            <h2>ห้อง: <span id="displayRoomCode"></span></h2>
+            <p class="status-text">กำลังรอเพื่อนๆ...</p>
+            <ul id="userList" class="user-list card">
+            </ul>
+            <button id="startBtn" class="btn-primary hidden">เริ่มเกม (Start)</button>
+        </div>
+
+        <div id="screen-writing" class="screen">
+            <h2>ส่งความในใจ</h2>
+            <p class="status-text" id="writingStatus">เขียนข้อความถึงเพื่อนๆ ให้ครบทุกคน</p>
+
+            <div id="writingArea" class="writing-container">
+            </div>
+
+            <button id="submitBtn" class="btn-primary disabled">ส่งข้อความทั้งหมด</button>
+        </div>
+
+        <div id="screen-reveal" class="screen">
+            <div id="countdownOverlay" class="countdown-overlay hidden">
+                <div id="countdownNum">3</div>
+                <p>เตรียมรับความทัชใจ...</p>
+            </div>
+
+            <div id="messagesResult" class="hidden fade-in">
+                <h2>ข้อความถึงคุณ</h2>
+                <p class="status-text">นี่คือสิ่งที่เพื่อนๆ บอกคุณ (ไม่ระบุตัวตน)</p>
+                <div id="inboxContainer" class="inbox-grid">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myUsername = '';
+        let currentRoomCode = '';
+        let targetsList = []; // เก็บรายชื่อคนที่เราต้องเขียนหา
+
+        // --- DOM Elements ---
+        const screens = document.querySelectorAll('.screen');
+        const joinBtn = document.getElementById('joinBtn');
+        const startBtn = document.getElementById('startBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const usernameInput = document.getElementById('usernameInput');
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const userListUI = document.getElementById('userList');
+        const writingAreaUI = document.getElementById('writingArea');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNum = document.getElementById('countdownNum');
+        const messagesResultUI = document.getElementById('messagesResult');
+
+        // --- Helper: ฟังก์ชันสลับหน้าจอ ---
+        function showScreen(screenId) {
+            screens.forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // --- Event Listeners (ปุ่มต่างๆ) ---
+        joinBtn.addEventListener('click', () => {
+            const username = usernameInput.value.trim();
+            const roomCode = roomCodeInput.value.trim();
+            if (username && roomCode) {
+                myUsername = username;
+                currentRoomCode = roomCode;
+                // ส่งข้อมูลไปบอก Server ว่าขอเข้าห้อง
+                socket.emit('joinRoom', { username, roomCode });
+                showScreen('screen-waiting');
+                document.getElementById('displayRoomCode').innerText = roomCode;
+            } else {
+                alert('กรุณากรอกชื่อและรหัสห้อง');
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            socket.emit('startGame', currentRoomCode);
+        });
+
+        submitBtn.addEventListener('click', () => {
+            if (submitBtn.classList.contains('disabled')) return;
+
+            // รวบรวมข้อความที่เขียน
+            const messagesToSend = [];
+            targetsList.forEach(target => {
+                const input = document.getElementById(`msg-to-${target.id}`);
+                messagesToSend.push({
+                    targetId: target.id,
+                    content: input.value.trim()
+                });
+            });
+
+            socket.emit('submitMessages', { roomCode: currentRoomCode, messages: messagesToSend });
+
+            // ปรับ UI เพื่อรอคนอื่น
+            document.getElementById('writingStatus').innerText = "ส่งแล้ว! รอเพื่อนคนอื่นสักครู่...";
+            writingAreaUI.innerHTML = '<div class="loader"></div>'; // แสดง loading
+            submitBtn.classList.add('hidden');
+        });
+
+        // --- Socket Events (รับข้อมูลจาก Server) ---
+
+        // อัปเดตข้อมูลห้อง (มีคนเข้า/ออก)
+        socket.on('updateRoomData', ({ users, isHost }) => {
+            userListUI.innerHTML = users.map(u => `<li>${u.name} ${u.id === socket.id ? '(คุณ)' : ''}</li>`).join('');
+            // ถ้าเป็นหัวหน้าห้อง ให้แสดงปุ่ม Start
+            if (isHost && users.length >= 2) {
+                startBtn.classList.remove('hidden');
+            } else {
+                startBtn.classList.add('hidden');
+            }
+        });
+
+        // เริ่มเกม: สร้างช่องกรอกข้อความ
+        socket.on('gameStarted', ({ targets }) => {
+            targetsList = targets;
+            showScreen('screen-writing');
+            writingAreaUI.innerHTML = ''; // เคลียร์ของเก่า
+
+            targets.forEach(target => {
+                const div = document.createElement('div');
+                div.className = 'message-input-card fade-in';
+                div.innerHTML = `
+                    <label>ถึง: <b>${target.name}</b></label>
+                    <textarea id="msg-to-${target.id}" placeholder="พิมพ์ข้อความ..."></textarea>
+                `;
+                writingAreaUI.appendChild(div);
+
+                // เช็คว่ากรอกครบหรือยัง เพื่อเปิดปุ่ม Submit
+                const textarea = div.querySelector('textarea');
+                textarea.addEventListener('input', checkAllInputsFilled);
+            });
+        });
+
+        function checkAllInputsFilled() {
+            let allFilled = true;
+            targetsList.forEach(target => {
+                const val = document.getElementById(`msg-to-${target.id}`).value.trim();
+                if (val === '') allFilled = false;
+            });
+
+            if (allFilled && targetsList.length > 0) {
+                submitBtn.classList.remove('disabled');
+            } else {
+                submitBtn.classList.add('disabled');
+            }
+        }
+
+        // อัปเดตสถานะการส่ง (เช่น "รอเพื่อนๆ 2/3")
+        socket.on('updateStatus', (msg) => {
+            document.getElementById('writingStatus').innerText = msg;
+        });
+
+        // ทุกคนส่งครบแล้ว -> เริ่มนับถอยหลัง
+        socket.on('allSubmitted', () => {
+            showScreen('screen-reveal');
+            countdownOverlay.classList.remove('hidden');
+            messagesResultUI.classList.add('hidden');
+
+            let count = 3;
+            countdownNum.innerText = count;
+            const timer = setInterval(() => {
+                count--;
+                countdownNum.innerText = count;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    countdownOverlay.classList.add('hidden');
+                    messagesResultUI.classList.remove('hidden');
+                }
+            }, 1000);
+        });
+
+        // ได้รับข้อความเฉลย (Inbox)
+        socket.on('revealMessages', (messages) => {
+            const container = document.getElementById('inboxContainer');
+            container.innerHTML = '';
+
+            if (messages.length === 0) {
+                container.innerHTML = '<p>ไม่มีข้อความถึงคุณ (เอ๊ะ?)</p>';
+                return;
+            }
+
+            messages.forEach((msg, index) => {
+                // เพิ่ม delay เล็กน้อยให้การ์ดค่อยๆ โผล่มาทีละใบ
+                setTimeout(() => {
+                    const card = document.createElement('div');
+                    card.className = 'result-card pop-in';
+                    card.innerHTML = `"${msg.content}"`;
+                    container.appendChild(card);
+                }, index * 300);
+            });
+        });
+
+    </script>
+</body>
+
+</html>
