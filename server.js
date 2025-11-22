@@ -12,8 +12,12 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // 1. ผู้เล่นเข้าร่วมห้อง
     socket.on('joinRoom', ({ username, roomCode }) => {
         socket.join(roomCode);
+
+        // ตัดช่องว่างหน้าหลังออกกันพลาด
+        const cleanName = username.trim();
 
         if (!rooms[roomCode]) {
             rooms[roomCode] = {
@@ -24,69 +28,66 @@ io.on('connection', (socket) => {
             };
         }
 
-        // เช็คก่อนว่าชื่อซ้ำในห้องไหม ถ้าซ้ำให้เติมเลขต่อท้าย (เช่น ตูนโวย (2))
-        let finalName = username;
-        let count = 2;
-        while (rooms[roomCode].users.some(u => u.name === finalName)) {
-            finalName = `${username} (${count})`;
-            count++;
-        }
+        // ==== จุดที่แก้ใหม่ (Logic สวมรอย) ====
+        // เช็คว่ามีชื่อนี้ในห้องแล้วหรือยัง?
+        const existingUser = rooms[roomCode].users.find(u => u.name === cleanName);
 
-        rooms[roomCode].users.push({ id: socket.id, name: finalName });
+        if (existingUser) {
+            // เจอคนชื่อซ้ำ! สันนิษฐานว่าเป็นคนเดิมที่กด Refresh
+            // อัปเดต ID ให้เป็นอันใหม่ปัจจุบัน
+            existingUser.id = socket.id;
+            console.log(`User rejoined: ${cleanName} (New ID: ${socket.id})`);
+        } else {
+            // ไม่เจอชื่อซ้ำ สร้างใหม่ตามปกติ
+            rooms[roomCode].users.push({ id: socket.id, name: cleanName });
+        }
+        // ====================================
+
         updateRoomDetails(roomCode);
     });
 
+    // 2. หัวหน้าห้องกดเริ่มเกม
     socket.on('startGame', (roomCode) => {
         if (rooms[roomCode] && rooms[roomCode].users.length >= 2) {
             rooms[roomCode].gameState = 'writing';
             rooms[roomCode].users.forEach(user => {
-                const targets = rooms[roomCode].users.filter(u => u.id !== user.id);
+                // ส่งรายชื่อเป้าหมายให้ทุกคน (กรองตัวเองออก)
+                const targets = rooms[roomCode].users.filter(u => u.name !== user.name);
                 io.to(user.id).emit('gameStarted', { targets: targets });
             });
         }
     });
 
+    // 3. ผู้เล่นส่งข้อความ
     socket.on('submitMessages', ({ roomCode, messages }) => {
         if (!rooms[roomCode]) return;
+
         rooms[roomCode].messageBuffer.push(...messages);
         rooms[roomCode].submittedCount++;
+
         const totalPlayers = rooms[roomCode].users.length;
 
         io.to(roomCode).emit('updateStatus', `รอเพื่อนๆ ส่งข้อความ (${rooms[roomCode].submittedCount}/${totalPlayers})`);
 
-        if (rooms[roomCode].submittedCount === totalPlayers) {
+        if (rooms[roomCode].submittedCount >= totalPlayers) {
             rooms[roomCode].gameState = 'revealing';
             io.to(roomCode).emit('allSubmitted');
+
             setTimeout(() => {
                 distributeMessages(roomCode);
             }, 3500);
         }
     });
 
-    // ==== ส่วนที่เพิ่มมาใหม่: จัดการเมื่อคนหลุด/รีเฟรช ====
+    // 4. จัดการเมื่อคนหลุด
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+        // เราจะไม่รีบลบ user ทันที เพื่อรองรับกรณี refresh แล้วกลับมา
+        // แต่ถ้าอยากลบจริงๆ อาจต้องใช้วิธีอื่น หรือปล่อยไว้แบบนี้เพื่อให้ Reconnect ได้
+        console.log('User disconnected (waiting for reconnect or timeout):', socket.id);
 
-        // วนหาว่า User ที่หลุด อยู่ห้องไหน
-        for (const roomCode in rooms) {
-            const room = rooms[roomCode];
-            const index = room.users.findIndex(u => u.id === socket.id);
-
-            if (index !== -1) {
-                // ลบ User ออกจาก array
-                room.users.splice(index, 1);
-
-                // ถ้าห้องว่างเปล่า ให้ลบห้องทิ้ง
-                if (room.users.length === 0) {
-                    delete rooms[roomCode];
-                } else {
-                    // ถ้ายังมีคนอยู่ ให้ update ข้อมูลใหม่ให้คนที่เหลือ
-                    // (ถ้า Host หลุด คนที่ 2 จะกลายเป็น users[0] อัตโนมัติ)
-                    updateRoomDetails(roomCode);
-                }
-                break;
-            }
-        }
+        // *หมายเหตุ: ใน Logic แบบสวมรอย เราจะไม่ลบ User ออกจาก array ทันทีที่ disconnect
+        // เพราะถ้าลบไป เดี๋ยวตอน connect เข้ามาใหม่ มันจะหาชื่อเก่าไม่เจอ
+        // เราจะปล่อยให้ชื่อค้างไว้ ถ้าเขาไม่กลับมาจริงๆ ค่อยให้คนในห้องสร้างห้องใหม่เล่นกัน
     });
 
     function distributeMessages(roomCode) {
@@ -94,7 +95,7 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         room.users.forEach(user => {
-            // แก้ตรงนี้: เช็คจากชื่อ (targetName === user.name) แทน ID
+            // คัดแยกจดหมายด้วย "ชื่อ" (Name)
             const myMessages = room.messageBuffer
                 .filter(msg => msg.targetName === user.name)
                 .map(msg => ({ content: msg.content }));
@@ -102,16 +103,17 @@ io.on('connection', (socket) => {
             io.to(user.id).emit('revealMessages', myMessages);
         });
 
-        // (Optional) ล้างข้อมูลห้องหลังเล่นจบ เพื่อประหยัด Ram
+        // เคลียร์ห้องหลังจบเกม (ถ้าต้องการ)
         // delete rooms[roomCode];
     }
 
-    // ฟังก์ชันช่วยส่งข้อมูลห้อง (แก้ Logic การหา Host)
     function updateRoomDetails(roomCode) {
         const room = rooms[roomCode];
         if (!room) return;
 
-        // ส่งข้อมูลให้ทุกคน โดยบอกด้วยว่า "ใครคือ Host ID ปัจจุบัน"
+        // ป้องกัน error กรณีไม่มี user เหลือ
+        if (room.users.length === 0) return;
+
         const hostId = room.users[0].id;
 
         io.to(roomCode).emit('updateRoomData', {
