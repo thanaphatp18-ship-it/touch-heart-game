@@ -187,6 +187,7 @@
         });
 
         // ทุกคนส่งครบแล้ว -> เริ่มนับถอยหลัง
+        // ...
         socket.on('allSubmitted', () => {
             showScreen('screen-reveal');
             countdownOverlay.classList.remove('hidden');
@@ -194,14 +195,19 @@
 
             let count = 3;
             countdownNum.innerText = count;
+
             const timer = setInterval(() => {
                 count--;
-                countdownNum.innerText = count;
-                if (count <= 0) {
+
+                // *** แก้ไข Logic ตรงนี้: ถ้า count > 0 ให้แสดงตัวเลข, ถ้าไม่ใช่ ให้ซ่อนทันที ***
+                if (count > 0) {
+                    countdownNum.innerText = count;
+                } else {
                     clearInterval(timer);
-                    countdownOverlay.classList.add('hidden');
-                    messagesResultUI.classList.remove('hidden');
+                    countdownOverlay.classList.add('hidden'); // Overlay หายไป
+                    messagesResultUI.classList.remove('hidden'); // ข้อความถึงคุณปรากฏ
                 }
+                // *************************************************************************
             }, 1000);
         });
 

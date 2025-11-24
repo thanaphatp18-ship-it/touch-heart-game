@@ -1,4 +1,8 @@
 /* --- BASE STYLES --- */
+.hidden {
+    display: none !important;
+}
+
 body {
     font-family: 'Arial', sans-serif;
     margin: 0;
