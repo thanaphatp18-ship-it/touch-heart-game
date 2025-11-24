@@ -58,13 +58,6 @@
         </div>
     </div>
 
-    <div id="popup-overlay">
-        <div class="popup-content">
-            <h3 id="popup-title">แจ้งเตือน</h3>
-            <p id="popup-message">ข้อความแจ้งเตือน</p>
-            <button id="popup-close-btn" class="popup-close-btn">ตกลง</button>
-        </div>
-    </div>
     <script>
         const socket = io();
         let myUsername = '';
@@ -72,6 +65,7 @@
         let targetsList = []; // เก็บรายชื่อคนที่เราต้องเขียนหา
 
         // --- DOM Elements ---
+        // แก้ไข: รวมการประกาศตัวแปร DOM ทั้งหมดไว้ด้วยกัน
         const screens = document.querySelectorAll('.screen');
         const joinBtn = document.getElementById('joinBtn');
         const startBtn = document.getElementById('startBtn');
@@ -86,27 +80,11 @@
         const restartBtn = document.getElementById('restartBtn');
         const refreshBtn = document.getElementById('refreshBtn');
 
-        // ตัวแปร DOM ของ Pop-up
-        const popupOverlay = document.getElementById('popup-overlay');
-        const popupCloseBtn = document.getElementById('popup-close-btn');
 
         // --- Helper: ฟังก์ชันสลับหน้าจอ ---
         function showScreen(screenId) {
             screens.forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
-        }
-
-        // --- Helper: ฟังก์ชันแสดง Pop-up (แทน alert) ---
-        let popupTimer;
-        function showPopup(message, duration = 5000) {
-            clearTimeout(popupTimer);
-            document.getElementById('popup-message').innerText = message;
-            popupOverlay.classList.add('show');
-
-            // ตั้งเวลาปิดอัตโนมัติ (5 วินาที)
-            popupTimer = setTimeout(() => {
-                popupOverlay.classList.remove('show');
-            }, duration);
         }
 
         // --- Event Listeners (ปุ่มต่างๆ) ---
@@ -116,11 +94,12 @@
             if (username && roomCode) {
                 myUsername = username;
                 currentRoomCode = roomCode;
+                // ส่งข้อมูลไปบอก Server ว่าขอเข้าห้อง
                 socket.emit('joinRoom', { username, roomCode });
                 showScreen('screen-waiting');
                 document.getElementById('displayRoomCode').innerText = roomCode;
             } else {
-                showPopup('กรุณากรอกชื่อและรหัสห้อง');
+                alert('กรุณากรอกชื่อและรหัสห้อง');
             }
         });
 
@@ -131,6 +110,7 @@
         submitBtn.addEventListener('click', () => {
             if (submitBtn.classList.contains('disabled')) return;
 
+            // รวบรวมข้อความที่เขียน
             const messagesToSend = [];
             targetsList.forEach(target => {
                 const input = document.getElementById(`msg-to-${target.id}`);
@@ -157,24 +137,20 @@
             socket.emit('requestRestart', currentRoomCode);
             showScreen('screen-lobby');
 
+            // เคลียร์ค่าค้างใน UI (ใช้ชื่อ/โค้ดเดิม)
             targetsList = [];
             usernameInput.value = myUsername;
             roomCodeInput.value = currentRoomCode;
         });
 
-        // Event Listener สำหรับปิด Pop-up ด้วยปุ่ม
-        popupCloseBtn.addEventListener('click', () => {
-            clearTimeout(popupTimer);
-            popupOverlay.classList.remove('show');
-        });
-
 
         // --- Socket Events (รับข้อมูลจาก Server) ---
 
+        // เริ่มเกม: สร้างช่องกรอกข้อความ
         socket.on('gameStarted', ({ targets }) => {
             targetsList = targets;
             showScreen('screen-writing');
-            writingAreaUI.innerHTML = '';
+            writingAreaUI.innerHTML = ''; // เคลียร์ของเก่า
 
             targets.forEach(target => {
                 const div = document.createElement('div');
@@ -185,6 +161,7 @@
                 `;
                 writingAreaUI.appendChild(div);
 
+                // เช็คว่ากรอกครบหรือยัง เพื่อเปิดปุ่ม Submit
                 const textarea = div.querySelector('textarea');
                 textarea.addEventListener('input', checkAllInputsFilled);
             });
@@ -204,10 +181,12 @@
             }
         }
 
+        // อัปเดตสถานะการส่ง (เช่น "รอเพื่อนๆ 2/3")
         socket.on('updateStatus', (msg) => {
             document.getElementById('writingStatus').innerText = msg;
         });
 
+        // ทุกคนส่งครบแล้ว -> เริ่มนับถอยหลัง
         socket.on('allSubmitted', () => {
             showScreen('screen-reveal');
             countdownOverlay.classList.remove('hidden');
@@ -226,9 +205,10 @@
             }, 1000);
         });
 
+        // ได้รับข้อความเฉลย (Inbox)
         socket.on('revealMessages', (messages) => {
             const container = document.getElementById('inboxContainer');
-            container.innerHTML = '';
+            container.innerHTML = ''; // เคลียร์ของเก่า
 
             if (messages.length === 0) {
                 container.innerHTML = '<p class="status-text">😢 ไม่มีข้อความถูกส่งมาถึงคุณเลย</p>';
@@ -245,22 +225,27 @@
 
         // รับแจ้งเตือนเมื่อห้องถูกลบ (Room Deletion)
         socket.on('roomDeleted', () => {
-            showPopup('หัวหน้าห้องได้ปิดห้องและเริ่มต้นใหม่แล้ว กรุณาเข้าห้องใหม่อีกครั้ง');
+            alert('หัวหน้าห้องได้ปิดห้องและเริ่มต้นใหม่แล้ว กรุณาเข้าห้องใหม่อีกครั้ง');
             showScreen('screen-lobby');
         });
 
+        // อัปเดตข้อมูลห้อง (มีคนเข้า/ออก)
         socket.on('updateRoomData', ({ users, hostId }) => {
+            // แสดงรายชื่อ
             userListUI.innerHTML = users.map(u =>
                 `<li>${u.name} ${u.id === socket.id ? '(คุณ)' : ''} ${u.id === hostId ? '👑' : ''}</li>`
             ).join('');
 
+            // เช็คว่า ฉันคือ Host หรือไม่?
             if (socket.id === hostId) {
+                // เป็น Host: เช็คจำนวนคน ถ้า >= 2 ให้กดเริ่มได้
                 if (users.length >= 2) {
                     startBtn.classList.remove('hidden');
                 } else {
-                    startBtn.classList.add('hidden');
+                    startBtn.classList.add('hidden'); // คนยังไม่ครบ
                 }
             } else {
+                // ไม่ใช่ Host: ซ่อนปุ่มตลอดกาล
                 startBtn.classList.add('hidden');
             }
         });

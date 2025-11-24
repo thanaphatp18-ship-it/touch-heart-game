@@ -3,7 +3,9 @@ body {
     font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #f8f9fa;
+    /* สีพื้นหลังหลักที่อ่อนโยน */
+    background-color: #fce4ec;
+    /* สีชมพูพีชอ่อน (คล้ายในภาพตัวอย่าง) */
     color: #343a40;
     display: flex;
     justify-content: center;
@@ -14,36 +16,18 @@ body {
 }
 
 .animated-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(45deg, #e0f7fa, #b3e5fc, #81d4fa);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
-    z-index: -1;
-}
-
-@keyframes gradientBG {
-    0% {
-        background-position: 0% 50%;
-    }
-
-    50% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0% 50%;
-    }
+    /* ลบ Animated Background เก่าออก เพื่อใช้สีพื้นหลัง body แทน */
+    display: none;
 }
 
 .container {
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: #ffffff;
+    /* การ์ดสีขาว */
     padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    border-radius: 25px;
+    /* มุมโค้งมนมากขึ้น */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    /* เงาที่ดูนุ่มนวลกว่า */
     width: 90%;
     max-width: 400px;
     transition: all 0.5s ease;
@@ -73,107 +57,117 @@ body {
 
 /* --- TYPOGRAPHY & TEXT --- */
 .main-title {
-    color: #007bff;
+    color: #343a40;
+    /* ใช้สีดำเข้ม */
     text-align: center;
     margin-bottom: 5px;
-    font-size: 2.2em;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    font-size: 2.8em;
+    /* ขนาดใหญ่ขึ้น */
+    font-weight: 800;
+    /* เน้นความหนา */
+    text-shadow: none;
 }
 
 .sub-title {
-    color: #6c757d;
+    color: #343a40;
     text-align: center;
     margin-top: 0;
-    margin-bottom: 25px;
-    font-size: 1.1em;
+    margin-bottom: 30px;
+    font-size: 1.2em;
+    font-weight: 500;
+}
+
+h2 {
+    color: #343a40;
+    font-weight: 700;
+    font-size: 1.8em;
 }
 
 .status-text {
     text-align: center;
-    color: #495057;
+    color: #6c757d;
     margin-bottom: 15px;
-    font-style: italic;
+    font-style: normal;
+    font-weight: 400;
 }
 
 /* --- INPUT & BUTTONS --- */
 .input-group input {
     width: 100%;
-    padding: 12px;
-    margin-bottom: 10px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    /* มุมโค้งมน */
     box-sizing: border-box;
-    font-size: 1em;
+    font-size: 1.1em;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-/* ปุ่มหลัก (สีน้ำเงิน) */
-.btn-primary {
-    background-color: #007bff;
+/* ปุ่มหลักและปุ่มรองทั้งหมดใช้สไตล์ไล่ระดับสี */
+.btn-primary,
+.btn-secondary,
+.popup-close-btn {
+    background: linear-gradient(90deg, #ff9a8b 0%, #ff6a88 100%);
+    /* ไล่ระดับสีส้ม-ชมพู */
     color: white;
     border: none;
-    padding: 12px 25px;
-    border-radius: 8px;
+    padding: 15px 25px;
+    border-radius: 15px;
+    /* มุมโค้งมน */
     cursor: pointer;
-    font-size: 1.1em;
+    font-size: 1.2em;
     font-weight: bold;
-    transition: background-color 0.3s ease, transform 0.1s ease;
+    transition: all 0.3s ease;
     width: 100%;
     margin-top: 15px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 5px 15px rgba(255, 106, 136, 0.4);
+    /* เงาจากสีปุ่ม */
 }
 
-.btn-primary:hover {
-    background-color: #0056b3;
-    transform: translateY(-1px);
+.btn-primary:hover,
+.btn-secondary:hover,
+.popup-close-btn:hover {
+    background: linear-gradient(90deg, #ff7a6b 0%, #ff4a68 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 7px 20px rgba(255, 106, 136, 0.6);
 }
 
-.btn-primary.hidden {
+.btn-primary.hidden,
+.btn-secondary.hidden {
     display: none;
 }
 
-.btn-primary.disabled {
-    background-color: #6c757d;
+.btn-primary.disabled,
+.btn-secondary.disabled {
+    background: #ced4da;
+    /* สีเทาอ่อนเมื่อ Disabled */
     cursor: not-allowed;
     box-shadow: none;
+    transform: none;
 }
 
-/* ปุ่มรอง (สีเทา) - ใช้สำหรับ Refresh และ Restart */
-.btn-secondary {
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
-    transition: background-color 0.3s ease, transform 0.1s ease;
-    width: 100%;
-    margin-top: 10px;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-    transform: translateY(-1px);
-}
-
-/* --- LISTS --- */
+/* --- LISTS (User List) --- */
 .user-list {
     list-style: none;
     padding: 0;
     margin: 15px 0;
-    background-color: #f1f1f1;
-    border-radius: 8px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+    background-color: #ffffff;
+    border-radius: 12px;
+    /* ใช้เงาที่เบากว่าเดิม */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f1f1f1;
 }
 
 .user-list li {
-    padding: 10px 15px;
-    border-bottom: 1px solid #e9ecef;
+    padding: 15px;
+    border-bottom: 1px solid #f8f9fa;
+    /* เส้นแบ่งที่เบามาก */
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 500;
+    font-size: 1.1em;
 }
 
 .user-list li:last-child {
@@ -185,24 +179,24 @@ body {
     max-height: 40vh;
     overflow-y: auto;
     padding-right: 10px;
-    /* Space for scrollbar */
     margin-bottom: 15px;
 }
 
 .message-input-card {
     background-color: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 15px;
     margin-bottom: 15px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .message-input-card label {
     display: block;
     margin-bottom: 8px;
     font-weight: bold;
-    color: #007bff;
+    color: #ff6a88;
+    /* ใช้สีชมพูเน้น */
 }
 
 .message-input-card textarea {
@@ -210,7 +204,7 @@ body {
     min-height: 80px;
     padding: 10px;
     border: 1px solid #ced4da;
-    border-radius: 6px;
+    border-radius: 8px;
     box-sizing: border-box;
     font-size: 1em;
     resize: vertical;
@@ -223,30 +217,23 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.9);
+    /* ปรับให้โปร่งใสมากขึ้น */
+    background: rgba(255, 255, 255, 0.95);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 10;
-    border-radius: 15px;
+    border-radius: 25px;
+    /* ให้เข้ากับ container */
 }
 
 #countdownNum {
-    font-size: 4em;
+    font-size: 5em;
+    /* ทำให้ใหญ่ขึ้น */
     font-weight: bold;
     color: #dc3545;
     animation: pulse 1s infinite alternate;
-}
-
-@keyframes pulse {
-    from {
-        transform: scale(1);
-    }
-
-    to {
-        transform: scale(1.1);
-    }
 }
 
 .inbox-grid {
@@ -257,12 +244,12 @@ body {
 }
 
 .result-card {
-    background-color: #ffe0b2;
-    /* Light Orange/Peach for inbox */
-    border-left: 5px solid #ff9800;
-    /* Darker orange stripe */
+    /* ปรับปรุงสไตล์การ์ดข้อความ */
+    background-color: #fff3f8;
+    /* สีชมพูอ่อนมาก */
+    border-left: 5px solid #ff6a88;
     padding: 15px;
-    border-radius: 8px;
+    border-radius: 10px;
     margin-bottom: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -270,10 +257,10 @@ body {
 .result-card p {
     margin: 0;
     font-style: italic;
-    color: #333;
+    color: #343a40;
 }
 
-/* --- POPUP STYLES (เพิ่มใหม่) --- */
+/* --- POPUP STYLES --- */
 #popup-overlay {
     position: fixed;
     top: 0;
@@ -299,7 +286,7 @@ body {
     background-color: #ffffff;
     color: #343a40;
     padding: 30px;
-    border-radius: 10px;
+    border-radius: 15px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     text-align: center;
     max-width: 350px;
@@ -314,21 +301,6 @@ body {
 .popup-content h3 {
     margin-top: 0;
     color: #dc3545;
-    /* Red for alert title */
 }
 
-.popup-close-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-top: 15px;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
-
-.popup-close-btn:hover {
-    background-color: #c82333;
-}
+/* ปุ่มปิด Pop-up ใช้สไตล์เดียวกับปุ่มหลักแล้ว (ผ่าน .popup-close-btn) */
