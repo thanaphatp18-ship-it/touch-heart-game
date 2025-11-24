@@ -147,10 +147,15 @@
         // --- Socket Events (รับข้อมูลจาก Server) ---
 
         // เริ่มเกม: สร้างช่องกรอกข้อความ
+        // เริ่มเกม: สร้างช่องกรอกข้อความ
         socket.on('gameStarted', ({ targets }) => {
             targetsList = targets;
             showScreen('screen-writing');
             writingAreaUI.innerHTML = ''; // เคลียร์ของเก่า
+
+            // *** แก้ไข 1.1: ทำให้ปุ่ม Submit กลับมาแสดงและ Disabled ไว้ก่อน ***
+            submitBtn.classList.remove('hidden');
+            submitBtn.classList.add('disabled');
 
             targets.forEach(target => {
                 const div = document.createElement('div');

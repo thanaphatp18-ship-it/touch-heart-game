@@ -16,19 +16,19 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', ({ username, roomCode }) => {
         socket.join(roomCode);
 
-        // ตัดช่องว่างหน้าหลังออกกันพลาด
         const cleanName = username.trim();
 
         if (!rooms[roomCode]) {
             rooms[roomCode] = {
                 users: [],
                 gameState: 'waiting',
-                messageBuffer: [],
+                messageBuffer: [], // Buffer เก็บข้อความ โดยใช้ Target ID
                 submittedCount: 0
             };
         }
 
         // ==== Logic สวมรอย (Reconnect) ====
+        // ค้นหาคนชื่อซ้ำที่อาจหลุดไป (ใช้ชื่อที่ทำความสะอาดแล้ว)
         const existingUser = rooms[roomCode].users.find(u => u.name === cleanName);
 
         if (existingUser) {
@@ -48,13 +48,14 @@ io.on('connection', (socket) => {
             const user = rooms[roomCode].users.find(u => u.id === socket.id);
             if (user) {
                 // ส่งรายชื่อเป้าหมายอีกครั้ง
-                const targets = rooms[roomCode].users.filter(u => u.name !== user.name);
+                const targets = rooms[roomCode].users.filter(u => u.id !== user.id); // กรองด้วย ID เพื่อความแน่นอน
                 io.to(user.id).emit('gameStarted', { targets: targets });
                 io.to(user.id).emit('updateStatus', `เกมกำลังดำเนินต่อ...`);
             }
         } else if (rooms[roomCode].gameState === 'revealing') {
-            // ส่ง event allSubmitted เพื่อเริ่มนับถอยหลังทันที
             io.to(socket.id).emit('allSubmitted');
+            // หากต้องการให้เห็นข้อความทันทีเมื่อ Reconnect เข้ามาในหน้า Reveal ให้เรียก distributeMessages(roomCode)
+            // แต่เนื่องจากมันถูกเรียกไปแล้วเมื่อจบเกม, การทำซ้ำอาจไม่จำเป็น
         }
     });
 
@@ -62,13 +63,12 @@ io.on('connection', (socket) => {
     socket.on('startGame', (roomCode) => {
         if (rooms[roomCode] && rooms[roomCode].users.length >= 2) {
             rooms[roomCode].gameState = 'writing';
-            // รีเซ็ต Buffer และ Counter สำหรับรอบใหม่ (กรณีมี State ค้าง)
             rooms[roomCode].messageBuffer = [];
             rooms[roomCode].submittedCount = 0;
 
             rooms[roomCode].users.forEach(user => {
-                // ส่งรายชื่อเป้าหมายให้ทุกคน (กรองตัวเองออก)
-                const targets = rooms[roomCode].users.filter(u => u.name !== user.name);
+                // ส่งรายชื่อเป้าหมายให้ทุกคน (กรองตัวเองออกด้วย ID)
+                const targets = rooms[roomCode].users.filter(u => u.id !== user.id);
                 io.to(user.id).emit('gameStarted', { targets: targets });
             });
         }
@@ -78,7 +78,23 @@ io.on('connection', (socket) => {
     socket.on('submitMessages', ({ roomCode, messages }) => {
         if (!rooms[roomCode]) return;
 
-        rooms[roomCode].messageBuffer.push(...messages);
+        const senderId = socket.id;
+        const senderName = rooms[roomCode].users.find(u => u.id === senderId)?.name || 'Unknown';
+
+        messages.forEach(msg => {
+            // ค้นหา ID ของเป้าหมายจากชื่อที่ส่งมา
+            const targetUser = rooms[roomCode].users.find(u => u.name === msg.targetName);
+
+            if (targetUser) {
+                // เก็บข้อความโดยใช้ targetId ใน messageBuffer
+                rooms[roomCode].messageBuffer.push({
+                    targetId: targetUser.id,
+                    senderName: senderName,
+                    content: msg.content
+                });
+            }
+        });
+
         rooms[roomCode].submittedCount++;
 
         const totalPlayers = rooms[roomCode].users.length;
@@ -95,19 +111,14 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 4. จัดการเมื่อคนหลุด (ปล่อยให้ Reconnect Logic จัดการ)
     socket.on('disconnect', () => {
         console.log('User disconnected (waiting for reconnect or timeout):', socket.id);
-
-        // *หมายเหตุ: หากต้องการล้างผู้เล่นออกจากรายชื่อที่หลุดไปจริงๆ ให้เรียก updateRoomDetails ใน setTimeout
-        // แต่ในโค้ดนี้ เราจะให้ปุ่ม Refresh/Logic Reconnect จัดการแทน
     });
 
     // 5. Logic การล้างห้องและเล่นใหม่ (Restart)
     socket.on('requestRestart', (roomCode) => {
         if (rooms[roomCode]) {
             console.log(`Room ${roomCode} has been deleted for restart.`);
-            // แจ้งทุกคนในห้องว่าห้องถูกลบแล้ว
             io.to(roomCode).emit('roomDeleted');
             delete rooms[roomCode];
         }
@@ -125,15 +136,14 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         room.users.forEach(user => {
-            const userCleanName = user.name.trim().toLowerCase();
+            const userId = user.id;
 
-            // กรองข้อความด้วยชื่อ (Case-insensitive)
+            // กรองข้อความโดยใช้ targetId (ID ของผู้รับ)
             const myMessages = room.messageBuffer
-                .filter(msg => {
-                    const targetCleanName = msg.targetName ? msg.targetName.trim().toLowerCase() : '';
-                    return targetCleanName === userCleanName;
-                })
-                .map(msg => ({ content: msg.content }));
+                .filter(msg => msg.targetId === userId)
+                .map(msg => ({
+                    content: msg.content
+                }));
 
             io.to(user.id).emit('revealMessages', myMessages);
         });
@@ -148,17 +158,15 @@ io.on('connection', (socket) => {
         const hostUser = room.users.find(u => io.sockets.sockets.has(u.id));
 
         if (!hostUser) {
-            // ถ้าไม่มีใครเชื่อมต่ออยู่เลย
             delete rooms[roomCode];
             return;
         }
 
         const hostId = hostUser.id;
 
-        // 2. กรองผู้ใช้ที่หลุดไป (เพื่อความสะอาดของรายชื่อ)
+        // 2. กรองผู้ใช้ที่หลุดไป (โดยยึด Host ไว้)
         room.users = room.users.filter(u => io.sockets.sockets.has(u.id) || u.id === hostId);
 
-        // 3. ป้องกัน error กรณีไม่มี user เหลือหลังกรอง
         if (room.users.length === 0) {
             delete rooms[roomCode];
             return;
@@ -166,7 +174,7 @@ io.on('connection', (socket) => {
 
         io.to(roomCode).emit('updateRoomData', {
             users: room.users,
-            hostId: hostId // ID ของ Host ที่ใช้งานอยู่
+            hostId: hostId
         });
     }
 });
